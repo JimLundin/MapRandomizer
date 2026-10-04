@@ -405,7 +405,7 @@ pub fn get_room_state_ptrs(rom: &Rom, room_ptr: usize) -> Result<Vec<(usize, usi
 }
 
 pub fn apply_ips_patch(rom: &mut Rom, patch_path: &Path) -> Result<()> {
-    let patch_data = std::fs::read(patch_path)
+    let patch_data = std::fs::read(crate::paths::resolve_data_path(patch_path))
         .with_context(|| format!("Unable to read patch {}", patch_path.display()))?;
     let patch = ips::Patch::parse(&patch_data)
         .with_context(|| format!("Unable to parse patch {}", patch_path.display()))?;
