@@ -456,6 +456,7 @@ impl MapRando {
         random_seed: usize,
         display_seed: usize,
         fixed_map_seed: Option<usize>,
+        given_map: Option<&Map>,
         fixed_door_seed: Option<usize>,
         forbidden_start_locations: &[String],
         max_attempts: usize,
@@ -498,7 +499,10 @@ impl MapRando {
             let rng_door_seed = (rng.next_u64() & 0xFFFFFFFF) as usize;
             let door_randomization_seed = fixed_door_seed.unwrap_or(rng_door_seed);
 
-            let mut map = if fixed_map_seed.is_some() {
+            let mut map = if let Some(m) = given_map {
+                // A shared map layout given directly (with areas already assigned).
+                m.clone()
+            } else if fixed_map_seed.is_some() {
                 // A shared map layout: always use the same map, rather than moving on to the
                 // next map in the batch after a failed attempt.
                 if fixed_map.is_none() {
@@ -518,7 +522,9 @@ impl MapRando {
                 }
                 map_batch.pop().context("empty map batch")?
             };
-            if requires_area_assignment && !assign_map_areas(&mut map, settings, map_seed, game_data)
+            if given_map.is_none()
+                && requires_area_assignment
+                && !assign_map_areas(&mut map, settings, map_seed, game_data)
             {
                 info!("Area assignment failed for map seed={map_seed}");
                 if fixed_map_seed.is_some() {
@@ -615,7 +621,9 @@ impl MapRando {
     }
 
     /// Generate a randomization (map, doors, objectives, item placement). Returns JSON.
-    #[pyo3(signature = (settings_json, random_seed, display_seed=None, fixed_map_seed=None, fixed_door_seed=None, forbidden_start_locations=vec![], max_attempts=2000, include_spoiler_log=false))]
+    /// `fixed_map_json` gives a map layout to use (with areas already assigned), e.g. the map of another
+    /// randomization, for worlds sharing a map.
+    #[pyo3(signature = (settings_json, random_seed, display_seed=None, fixed_map_seed=None, fixed_map_json=None, fixed_door_seed=None, forbidden_start_locations=vec![], max_attempts=2000, include_spoiler_log=false))]
     #[allow(clippy::too_many_arguments)]
     fn randomize(
         &self,
@@ -623,6 +631,7 @@ impl MapRando {
         random_seed: usize,
         display_seed: Option<usize>,
         fixed_map_seed: Option<usize>,
+        fixed_map_json: Option<&str>,
         fixed_door_seed: Option<usize>,
         forbidden_start_locations: Vec<String>,
         max_attempts: usize,
@@ -632,12 +641,17 @@ impl MapRando {
             return Err(PyRuntimeError::new_err("Invalid random seed: 0"));
         }
         let settings = self.parse_settings(settings_json).map_err(to_py_err)?;
+        let fixed_map: Option<Map> = match fixed_map_json {
+            Some(j) => Some(serde_json::from_str(j).map_err(|e| to_py_err(e.into()))?),
+            None => None,
+        };
         let output = self
             .randomize_impl(
                 &settings,
                 random_seed,
                 display_seed.unwrap_or(random_seed),
                 fixed_map_seed,
+                fixed_map.as_ref(),
                 fixed_door_seed,
                 &forbidden_start_locations,
                 max_attempts,
@@ -647,7 +661,9 @@ impl MapRando {
         serde_json::to_string(&output).map_err(|e| to_py_err(e.into()))
     }
 
-    /// Patch an (unheadered, vanilla) Super Metroid ROM according to a randomization.
+    /// Patch an (unheadered, vanilla) Super Metroid ROM according to a randomization. If `item_plm_types` is given
+    /// (visible, chozo orb, shot block), these PLM types are used for all items except Nothing.
+    #[pyo3(signature = (base_rom, settings_json, randomization_json, customize_json, item_plm_types=None))]
     fn make_rom<'py>(
         &self,
         py: Python<'py>,
@@ -655,6 +671,7 @@ impl MapRando {
         settings_json: &str,
         randomization_json: &str,
         customize_json: &str,
+        item_plm_types: Option<[isize; 3]>,
     ) -> PyResult<Bound<'py, PyBytes>> {
         let settings = self.parse_settings(settings_json).map_err(to_py_err)?;
         let mut randomization: Randomization = serde_json::from_str(randomization_json)
@@ -667,6 +684,7 @@ impl MapRando {
         let customize_settings = parse_customize_settings(&customize_req).map_err(to_py_err)?;
         let mut rom = Rom::new(base_rom.to_vec());
         rom.data.resize(0x400000, 0);
+        maprando::patch::set_item_plm_override(item_plm_types);
         let output = make_rom(
             &rom,
             &settings,
@@ -675,8 +693,9 @@ impl MapRando {
             &self.game_data,
             &self.samus_sprite_categories,
             &self.mosaic_themes,
-        )
-        .map_err(to_py_err)?;
+        );
+        maprando::patch::set_item_plm_override(None);
+        let output = output.map_err(to_py_err)?;
         Ok(PyBytes::new(py, &output.data))
     }
 

@@ -258,11 +258,32 @@ pub fn xy_to_explored_bit_ptr(x: isize, y: isize) -> (isize, u8) {
     (offset_byte_part, offset_bitmask)
 }
 
+// Optional replacement item PLM types (visible, chozo orb, shot block), used for all items except Nothing.
+// This allows external patches to provide their own item PLMs (e.g. the Archipelago multiworld item PLMs).
+static ITEM_PLM_OVERRIDE: std::sync::RwLock<Option<[isize; 3]>> = std::sync::RwLock::new(None);
+
+pub fn set_item_plm_override(plm_types: Option<[isize; 3]>) {
+    *ITEM_PLM_OVERRIDE.write().unwrap() = plm_types;
+}
+
+fn item_plm_override() -> Option<[isize; 3]> {
+    *ITEM_PLM_OVERRIDE.read().unwrap()
+}
+
+fn is_item_plm_type(plm_type: isize) -> bool {
+    (0xEED7..=0xF100).contains(&plm_type) || item_plm_override().is_some_and(|o| o.contains(&plm_type))
+}
+
 fn item_to_plm_type(item: Item, orig_plm_type: isize) -> isize {
     let item_id = item as isize;
 
     // Item container: 0 = none, 1 = chozo orb, 2 = shot block (scenery)
     let item_container = (orig_plm_type - 0xEED7) / 84;
+    if let Some(override_types) = item_plm_override()
+        && item != Item::Nothing
+    {
+        return override_types[item_container as usize];
+    }
 
     let plm_table: [[isize; 25]; 3] = [
         [
@@ -3075,7 +3096,7 @@ impl Patcher<'_> {
                 if plm_type == 0x0000 {
                     break;
                 }
-                if (0xEED7..=0xF100).contains(&plm_type) {
+                if is_item_plm_type(plm_type) {
                     // item PLM
                     let mut plm_x = self.rom.read_u8(intersection_plm_ptr + 2)?;
                     let mut plm_y = self.rom.read_u8(intersection_plm_ptr + 3)?;
