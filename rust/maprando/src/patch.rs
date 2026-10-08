@@ -265,6 +265,20 @@ fn is_item_plm_type(plm_type: isize) -> bool {
     (0xEED7..=0xF100).contains(&plm_type) || FOREIGN_ITEM_PLM_TYPES.contains(&plm_type)
 }
 
+// The message box font's tile number for a character (patches/src/tables/dialog_chars.tbl, and the HUD digits).
+fn message_box_tile(c: char) -> Option<isize> {
+    match c {
+        'A'..='Z' => Some(0xC0 + (c as isize - 'A' as isize)),
+        '0'..='9' => Some(c as isize - '0' as isize),
+        ' ' => Some(0x0F),
+        '.' => Some(0xDA),
+        '-' => Some(0xDD),
+        '?' => Some(0xDE),
+        '!' => Some(0xDF),
+        _ => None,
+    }
+}
+
 fn foreign_item_plm_type(orig_plm_type: isize) -> isize {
     let item_container = (orig_plm_type - 0xEED7) / 84;
     FOREIGN_ITEM_PLM_TYPES[item_container as usize]
@@ -630,6 +644,7 @@ impl Patcher<'_> {
 
         if self.settings.other_settings.wall_jump == WallJump::Collectible
             || self.settings.other_settings.speed_booster == SpeedBooster::Split
+            || !self.randomization.foreign_items.is_empty()
         {
             patches.push("extended_msg_boxes");
         }
@@ -3019,6 +3034,53 @@ impl Patcher<'_> {
         Ok(())
     }
 
+    // The messages of the foreign items (patches/src/foreign_item.asm, `foreign_item_messages`).
+    fn write_foreign_item_messages(&mut self) -> Result<()> {
+        const ROW_CHARS: usize = 26;
+        let mut addr = snes2pc(0x83C000);
+        for foreign_item in &self.randomization.foreign_items {
+            let rows = &foreign_item.message;
+            if rows.is_empty() {
+                continue;
+            }
+            ensure!(
+                rows.len() <= 2,
+                "a foreign item message has more than 2 rows"
+            );
+            let loc = self.game_data.item_locations[foreign_item.location_idx];
+            let item_bit = self.rom.read_u16(self.game_data.node_ptr_map[&loc] + 4)?;
+            let rows_flag = if rows.len() == 2 { 0x8000 } else { 0 };
+            self.rom.write_u16(addr, item_bit | rows_flag)?;
+            for i in 0..2 {
+                let text = rows.get(i).map(String::as_str).unwrap_or("");
+                let chars: Vec<char> = text.chars().collect();
+                ensure!(
+                    chars.len() <= ROW_CHARS,
+                    "foreign item message row longer than {ROW_CHARS} characters: {text}"
+                );
+                let left = (ROW_CHARS - chars.len()) / 2;
+                for col in 0..ROW_CHARS {
+                    let c = if col >= left && col < left + chars.len() {
+                        chars[col - left]
+                    } else {
+                        ' '
+                    };
+                    let tile = message_box_tile(c).with_context(|| {
+                        format!("unsupported character '{c}' in message: {text}")
+                    })?;
+                    self.rom.write_u8(addr + 2 + i * ROW_CHARS + col, tile)?;
+                }
+            }
+            addr += 2 + 2 * ROW_CHARS;
+        }
+        self.rom.write_u16(addr, 0xFFFF)?;
+        ensure!(
+            addr + 2 <= snes2pc(0x83D540),
+            "too many foreign item messages"
+        );
+        Ok(())
+    }
+
     fn write_foreign_item_graphics(&mut self) -> Result<()> {
         let w = 0xc;
         let frame_1: [[u8; 16]; 16] = [
@@ -3089,6 +3151,7 @@ impl Patcher<'_> {
         self.write_nothing_item_graphics()?;
         if !self.randomization.foreign_items.is_empty() {
             self.write_foreign_item_graphics()?;
+            self.write_foreign_item_messages()?;
         }
         Ok(())
     }

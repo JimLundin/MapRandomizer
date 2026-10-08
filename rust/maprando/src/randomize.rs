@@ -399,12 +399,16 @@ impl ForeignItemClass {
 
 // An item that belongs to another game (e.g. another player's world in a multiworld), at one of the item
 // locations. It gives Samus nothing, so the location's `item_placement` entry must be `Item::Nothing`; but the ROM
-// shows a collectible item there, whose pickup sets the location's item bit and calls the foreign item hook
-// (patches/src/foreign_item.asm).
+// shows a collectible item there, whose pickup sets the location's item bit, calls the foreign item hook, and shows
+// its message (patches/src/foreign_item.asm).
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ForeignItem {
     pub location_idx: usize, // Index into GameData.item_locations (and Randomization.item_placement)
     pub class: ForeignItemClass,
+    // The message box shown when it's picked up: up to 2 rows of up to 26 characters
+    // (A-Z, 0-9, space and . - ? !). None if empty.
+    #[serde(default)]
+    pub message: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize)]

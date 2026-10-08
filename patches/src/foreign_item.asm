@@ -2,20 +2,32 @@
 ;
 ; A foreign item looks and behaves like a collectible item: it is visible, and picking it up sets the location's
 ; item bit (the PLM room argument), so it stays collected and shows as collected on the map. It gives Samus
-; nothing. Instead of the fanfare and message box, the pickup calls `foreign_item_hook` with the location's item bit
-; in A. By default the hook only plays a sound; a ROM that knows what the item is (e.g. a multiworld patch) replaces
-; the hook with a JML to its own routine.
+; nothing. The pickup calls `foreign_item_hook` with the location's item bit in A (by default it does nothing; a ROM
+; that knows more about the item, e.g. a multiworld patch, replaces it with a JML to its own routine), then plays the
+; item fanfare (or, with fanfares off, a sound effect) and shows the item's message, if it has one.
 ;
-; The item PLMs are placed by patch.rs at locations listed in the randomization's `foreign_items`.
+; patch.rs places the item PLMs at the locations listed in the randomization's `foreign_items`, and writes their
+; messages to `foreign_item_messages`: for each item, a word with the item bit (bits 0-14) and the number of rows
+; minus one (bit 15), then two rows of 26 message box tile numbers (dialog_chars.tbl and the HUD digits $00-$09,
+; without their attributes); a word $FFFF ends the table. The message box is extended_msg_boxes.asm's message $30.
 
 lorom
+
+incsrc "constants.asm"
 
 !bank_84_free_space_start = $84F300
 !bank_84_free_space_end = $84F380
 !bank_84_free_space2_start = $84F690
 !bank_84_free_space2_end = $84F6D0
 !bank_85_free_space_start = $85A050
-!bank_85_free_space_end = $85A060
+!bank_85_free_space_end = $85A100
+!bank_94_free_space_start = $94B1B0
+!bank_94_free_space_end = $94B2A0
+
+!foreign_item_messages = $83C000      ; written by patch.rs, up to $83D540
+!foreign_item_message = $7EF4E4       ; offset of the message being shown in foreign_item_messages
+!message_row_chars = 26
+!message_entry_size = 54             ; 2 + 2 rows * !message_row_chars
 
 !foreign_item_gfx = $B800             ; bank $89 (written by patch.rs)
 
@@ -64,12 +76,12 @@ foreign_orb:
     dw $0001, $A2B5
     dw $86BC                               ; Delete
 
-; Instruction: call the foreign item hook, with the room argument (the location's item bit) in A.
+; Instruction: the foreign item's pickup, with the room argument (the location's item bit) in A.
 collect_foreign:
     phx
     phy
     lda $1DC7,x
-    jsl foreign_item_hook
+    jsl foreign_item_pickup
     ply
     plx
     rts
@@ -107,8 +119,151 @@ org !bank_85_free_space_start
 ; Called (JSL) when a foreign item is picked up, with A = the location's item bit, data bank $84.
 ; Replace the first four bytes with a JML to change what happens.
 foreign_item_hook:
-    lda #$0037                             ; Click sound (sound library 1)
-    jsl $809049
     rtl
+    nop : nop : nop
+
+; Message box $30 (jumped to from extended_msg_boxes.asm, in place of $85:8241): the foreign item message
+; [!foreign_item_message]. Like a small message box ($85:8289, $85:82B8, $85:8436), with the rows from the table.
+assert pc() == !foreign_item_message_box
+foreign_item_message_box:
+    ldx #$0000
+.top:                                  ; top border
+    lda $8040,x
+    sta $7E3200,x
+    inx : inx
+    cpx #$0040
+    bne .top
+    jsr $8136                          ; as $85:82B8
+    jsl $808F0C
+    jsl $8289EF
+    rep #$30
+    lda #$0070 : sta $05A6
+    lda #$007C : sta $05A4
+    stz $05A2
+    ldx #$0000
+    txa
+.clear:
+    sta $7E3000,x
+    inx : inx
+    cpx #$00E0
+    bne .clear
+    jsl foreign_item_message_rows
+    txa                                ; DMA size: the box with its borders
+    clc
+    adc #$0040
+    sta $09
+    ldy #$0000
+.bottom:                               ; bottom border
+    lda $8040,y
+    sta $7E3200,x
+    inx : inx : iny : iny
+    cpy #$0040
+    bne .bottom
+    jsr $8436                          ; small message box
+    rts
 
 assert pc() <= !bank_85_free_space_end
+
+org !bank_94_free_space_start
+; The pickup (JSL from the PLM), with A = the location's item bit, data bank $84.
+foreign_item_pickup:
+    php
+    rep #$30
+    pha                                ; the item bit, on the stack while looking for its message
+    jsl foreign_item_hook
+    ldx #$0000
+.find:                                 ; the item's message
+    lda.l !foreign_item_messages,x
+    cmp #$FFFF
+    beq .no_message
+    and #$7FFF
+    cmp $01,s
+    beq .message
+    txa : clc : adc.w #!message_entry_size : tax
+    bra .find
+.message:
+    pla
+    txa
+    sta.l !foreign_item_message
+    lda.l $848BF2
+    cmp #$00A9                         ; changed by itemsounds.asm (fanfares off)
+    bne .sound
+    phx                                ; as PLM instruction $84:8BDD with the item fanfare (music track 2)
+    ldx #$000E
+.clear_music_queue:
+    stz $0619,x
+    stz $0629,x
+    dex : dex
+    bpl .clear_music_queue
+    plx
+    lda $0639 : sta $063B
+    lda #$0000 : sta $063F : sta $063D
+    lda #$0002
+    jsl $808FC1
+    bra .show
+.sound:
+    lda #$0002                         ; as itemsounds.asm: the message box doesn't restart the music
+    sta $05D7
+    jsr click
+.show:
+    lda #$0030
+    jsl $858080
+    plp
+    rtl
+.no_message:
+    pla
+    jsr click
+    plp
+    rtl
+
+click:
+    lda #$0037                         ; Click sound (sound library 1)
+    jsl $809049
+    rts
+
+; The message rows, after the top border of the message box tilemap ($7E:3240); X = the end of the rows.
+foreign_item_message_rows:
+    lda.l !foreign_item_message
+    tax
+    lda.l !foreign_item_messages,x     ; rows - 1 in bit 15
+    asl
+    lda #$0000
+    rol
+    inc
+    sta $16
+    txa
+    inc : inc
+    sta $12                            ; the next tile number in the table
+    ldx #$0040
+.row:
+    lda #$000E                         ; box sides
+    sta $7E3200,x : sta $7E3202,x : sta $7E3204,x
+    txa : clc : adc #$0006 : tax
+    lda.w #!message_row_chars
+    sta $18
+.char:
+    phx
+    ldx $12
+    lda.l !foreign_item_messages,x
+    plx
+    and #$00FF
+    cmp #$000A
+    bcs .letter
+    ora #$3800                         ; digits (the HUD's), in the palette that draws them like the letters
+    bra .put
+.letter:
+    ora #$2C00
+.put:
+    sta $7E3200,x
+    inx : inx
+    inc $12
+    dec $18
+    bne .char
+    lda #$000E
+    sta $7E3200,x : sta $7E3202,x : sta $7E3204,x
+    txa : clc : adc #$0006 : tax
+    dec $16
+    bne .row
+    rtl
+
+assert pc() <= !bank_94_free_space_end

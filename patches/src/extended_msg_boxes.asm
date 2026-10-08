@@ -3,6 +3,8 @@
 
 lorom
 
+incsrc "constants.asm"
+
 !bank_85_free_space_start = $8596B0
 !bank_85_free_space_end = $859800
 
@@ -17,6 +19,10 @@ org $8582f1
 org !bank_85_free_space_start
 hook_item_id:
     lda $1c1f       ; replaced code
+    cmp !foreign_item_message_id
+    bne .not_foreign
+    jmp.w !foreign_item_message_box
+.not_foreign
     cmp #$001e      ; wall-jump boots or higher?
     bcc .original
     pha
