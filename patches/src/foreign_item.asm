@@ -6,7 +6,7 @@
 ; that knows more about the item, e.g. a multiworld patch, replaces it with a JML to its own routine), then plays the
 ; item fanfare (or, with fanfares off, a sound effect) and shows the item's message, if it has one.
 ;
-; Each class (progression, useful, filler) has its own graphics.
+; Each class (progression, useful, filler) has its own graphics: a four-colour orb, a blue gem, a grey pebble.
 ;
 ; patch.rs places the item PLMs at the locations listed in the randomization's `foreign_items`, and describes them
 ; in `foreign_items_table`: for each item, a word with the item bit (bits 0-9), the class (bits 12-13: 0
@@ -95,11 +95,11 @@ pickup_foreign:
     rts
 
 ; Arguments of instruction $8764 for each class (foreign_item_gfx_args_by_class): graphics in bank $89, written by
-; patch.rs, and palettes.
-gfx_args_progression:
-    dw $B800 : db $00, $00, $00, $00, $00, $00, $00, $00
-gfx_args_useful:
-    dw $B900 : db $00, $00, $00, $00, $00, $00, $00, $00
+; patch.rs, and the palette of each tile (top left, top right, bottom left, bottom right) in each frame.
+gfx_args_progression:                  ; the orb's quarters: gold, blue, pink, green, turning between the frames
+    dw $B800 : db $00, $03, $02, $01, $02, $00, $01, $03
+gfx_args_useful:                       ; blue
+    dw $B900 : db $03, $03, $03, $03, $03, $03, $03, $03
 
 assert pc() <= !bank_84_free_space_end
 
@@ -127,8 +127,8 @@ foreign_sce:
     dw $8A2E, $E032                        ; Call $E032 (empty item shot block reconcealing)
     dw $8724, .start                       ; Go to start
 
-gfx_args_filler:
-    dw $BA00 : db $00, $00, $00, $00, $00, $00, $00, $00
+gfx_args_filler:                       ; palette 1's greys
+    dw $BA00 : db $01, $01, $01, $01, $01, $01, $01, $01
 
 assert pc() <= !bank_84_free_space2_end
 
