@@ -16,7 +16,7 @@ use crate::{
         samus_sprite::SamusSpriteCategory, vanilla_music::override_music,
     },
     patch::map_tiles::diagonal_flip_tile,
-    randomize::{LockedDoor, Randomization, get_starting_items},
+    randomize::{ForeignItemClass, LockedDoor, Randomization, get_starting_items},
     settings::{
         AreaAssignmentPreset, CrashFixes, CrashFixesPreset, DisableETankSetting, ETankRefill,
         EnemyDrops, Fanfares, FixMode, ItemCount, MapPreset, MotherBrainFight, ObjPreset,
@@ -263,6 +263,127 @@ const FOREIGN_ITEM_PLM_TYPES: [isize; 3] = [0xF300, 0xF304, 0xF308];
 
 fn is_item_plm_type(plm_type: isize) -> bool {
     (0xEED7..=0xF100).contains(&plm_type) || FOREIGN_ITEM_PLM_TYPES.contains(&plm_type)
+}
+
+// The frames of a foreign item's graphics, by class: a bright diamond, a ring, a small dot.
+fn foreign_item_frames(class: ForeignItemClass) -> [[[u8; 16]; 16]; 2] {
+    let w = 0xc;
+    match class {
+        ForeignItemClass::Progression => [
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
+                [0, 0, 0, 7, 6, 5, 5, 3, 3, 5, 5, 6, 7, 0, 0, 0],
+                [0, 0, 7, 6, 5, 5, 3, w, w, 3, 5, 5, 6, 7, 0, 0],
+                [0, 7, 6, 5, 5, 3, w, w, w, w, 3, 5, 5, 6, 7, 0],
+                [0, 7, 6, 5, 5, 3, w, w, w, w, 3, 5, 5, 6, 7, 0],
+                [0, 0, 7, 6, 5, 5, 3, w, w, 3, 5, 5, 6, 7, 0, 0],
+                [0, 0, 0, 7, 6, 5, 5, 3, 3, 5, 5, 6, 7, 0, 0, 0],
+                [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ],
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
+                [0, 0, 0, 7, 6, 5, 5, w, w, 5, 5, 6, 7, 0, 0, 0],
+                [0, 0, 7, 6, 5, 5, w, 1, 1, w, 5, 5, 6, 7, 0, 0],
+                [0, 7, 6, 5, 5, w, 1, 1, 1, 1, w, 5, 5, 6, 7, 0],
+                [0, 7, 6, 5, 5, w, 1, 1, 1, 1, w, 5, 5, 6, 7, 0],
+                [0, 0, 7, 6, 5, 5, w, 1, 1, w, 5, 5, 6, 7, 0, 0],
+                [0, 0, 0, 7, 6, 5, 5, w, w, 5, 5, 6, 7, 0, 0, 0],
+                [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ],
+        ],
+        ForeignItemClass::Useful => [
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 7, 7, 4, 4, 4, 4, 4, 4, 7, 7, 0, 0, 0],
+                [0, 0, 7, 7, 4, 4, 4, 7, 7, 4, 4, 4, 7, 7, 0, 0],
+                [0, 0, 7, 4, 4, 7, 7, 0, 0, 7, 7, 4, 4, 7, 0, 0],
+                [0, 7, 4, 4, 7, 0, 0, 0, 0, 0, 0, 7, 4, 4, 7, 0],
+                [0, 7, 4, 4, 7, 0, 0, 0, 0, 0, 0, 7, 4, 4, 7, 0],
+                [0, 7, 4, 7, 0, 0, 0, 0, 0, 0, 0, 0, 7, 4, 7, 0],
+                [0, 7, 4, 7, 0, 0, 0, 0, 0, 0, 0, 0, 7, 4, 7, 0],
+                [0, 7, 4, 4, 7, 0, 0, 0, 0, 0, 0, 7, 4, 4, 7, 0],
+                [0, 7, 4, 4, 7, 0, 0, 0, 0, 0, 0, 7, 4, 4, 7, 0],
+                [0, 0, 7, 4, 4, 7, 7, 0, 0, 7, 7, 4, 4, 7, 0, 0],
+                [0, 0, 7, 7, 4, 4, 4, 7, 7, 4, 4, 4, 7, 7, 0, 0],
+                [0, 0, 0, 7, 7, 4, 4, 4, 4, 4, 4, 7, 7, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ],
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 7, 7, w, w, w, w, w, w, 7, 7, 0, 0, 0],
+                [0, 0, 7, 7, w, w, w, 7, 7, w, w, w, 7, 7, 0, 0],
+                [0, 0, 7, w, w, 7, 7, 0, 0, 7, 7, w, w, 7, 0, 0],
+                [0, 7, w, w, 7, 0, 0, 0, 0, 0, 0, 7, w, w, 7, 0],
+                [0, 7, w, w, 7, 0, 0, 0, 0, 0, 0, 7, w, w, 7, 0],
+                [0, 7, w, 7, 0, 0, 0, 0, 0, 0, 0, 0, 7, w, 7, 0],
+                [0, 7, w, 7, 0, 0, 0, 0, 0, 0, 0, 0, 7, w, 7, 0],
+                [0, 7, w, w, 7, 0, 0, 0, 0, 0, 0, 7, w, w, 7, 0],
+                [0, 7, w, w, 7, 0, 0, 0, 0, 0, 0, 7, w, w, 7, 0],
+                [0, 0, 7, w, w, 7, 7, 0, 0, 7, 7, w, w, 7, 0, 0],
+                [0, 0, 7, 7, w, w, w, 7, 7, w, w, w, 7, 7, 0, 0],
+                [0, 0, 0, 7, 7, w, w, w, w, w, w, 7, 7, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 7, 7, 7, 7, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ],
+        ],
+        ForeignItemClass::Filler => [
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 5, 5, 5, 5, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 5, 5, 5, 5, 5, 5, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 5, 5, 5, 5, 5, 5, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 5, 5, 5, 5, 5, 5, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 5, 5, 5, 5, 5, 5, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 5, 5, 5, 5, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ],
+            [
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 5, 5, 5, 5, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 5, 5, 3, 3, 5, 5, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 5, 3, 3, 3, 3, 5, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 5, 3, 3, 3, 3, 5, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 7, 5, 5, 3, 3, 5, 5, 7, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 7, 5, 5, 5, 5, 7, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 7, 7, 7, 7, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ],
+        ],
+    }
 }
 
 // The message box font's tile number for a character (patches/src/tables/dialog_chars.tbl, and the HUD digits).
@@ -3034,23 +3155,27 @@ impl Patcher<'_> {
         Ok(())
     }
 
-    // The messages of the foreign items (patches/src/foreign_item.asm, `foreign_item_messages`).
-    fn write_foreign_item_messages(&mut self) -> Result<()> {
+    // The foreign items' table (patches/src/foreign_item.asm, `foreign_items_table`): class and message.
+    fn write_foreign_items_table(&mut self) -> Result<()> {
         const ROW_CHARS: usize = 26;
         let mut addr = snes2pc(0x83C000);
         for foreign_item in &self.randomization.foreign_items {
             let rows = &foreign_item.message;
-            if rows.is_empty() {
-                continue;
-            }
             ensure!(
                 rows.len() <= 2,
                 "a foreign item message has more than 2 rows"
             );
             let loc = self.game_data.item_locations[foreign_item.location_idx];
             let item_bit = self.rom.read_u16(self.game_data.node_ptr_map[&loc] + 4)?;
-            let rows_flag = if rows.len() == 2 { 0x8000 } else { 0 };
-            self.rom.write_u16(addr, item_bit | rows_flag)?;
+            let class_bits = match foreign_item.class {
+                ForeignItemClass::Progression => 0,
+                ForeignItemClass::Useful => 1,
+                ForeignItemClass::Filler => 2,
+            };
+            self.rom.write_u16(
+                addr,
+                item_bit | class_bits << 12 | (rows.len() as isize) << 14,
+            )?;
             for i in 0..2 {
                 let text = rows.get(i).map(String::as_str).unwrap_or("");
                 let chars: Vec<char> = text.chars().collect();
@@ -3074,64 +3199,30 @@ impl Patcher<'_> {
             addr += 2 + 2 * ROW_CHARS;
         }
         self.rom.write_u16(addr, 0xFFFF)?;
-        ensure!(
-            addr + 2 <= snes2pc(0x83D540),
-            "too many foreign item messages"
-        );
+        ensure!(addr + 2 <= snes2pc(0x83D540), "too many foreign items");
         Ok(())
     }
 
     fn write_foreign_item_graphics(&mut self) -> Result<()> {
-        let w = 0xc;
-        let frame_1: [[u8; 16]; 16] = [
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
-            [0, 0, 0, 7, 6, 5, 5, 3, 3, 5, 5, 6, 7, 0, 0, 0],
-            [0, 0, 7, 6, 5, 5, 3, w, w, 3, 5, 5, 6, 7, 0, 0],
-            [0, 7, 6, 5, 5, 3, w, w, w, w, 3, 5, 5, 6, 7, 0],
-            [0, 7, 6, 5, 5, 3, w, w, w, w, 3, 5, 5, 6, 7, 0],
-            [0, 0, 7, 6, 5, 5, 3, w, w, 3, 5, 5, 6, 7, 0, 0],
-            [0, 0, 0, 7, 6, 5, 5, 3, 3, 5, 5, 6, 7, 0, 0, 0],
-            [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        let classes = [
+            ForeignItemClass::Progression,
+            ForeignItemClass::Useful,
+            ForeignItemClass::Filler,
         ];
-        let frame_2: [[u8; 16]; 16] = [
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
-            [0, 0, 0, 7, 6, 5, 5, w, w, 5, 5, 6, 7, 0, 0, 0],
-            [0, 0, 7, 6, 5, 5, w, 1, 1, w, 5, 5, 6, 7, 0, 0],
-            [0, 7, 6, 5, 5, w, 1, 1, 1, 1, w, 5, 5, 6, 7, 0],
-            [0, 7, 6, 5, 5, w, 1, 1, 1, 1, w, 5, 5, 6, 7, 0],
-            [0, 0, 7, 6, 5, 5, w, 1, 1, w, 5, 5, 6, 7, 0, 0],
-            [0, 0, 0, 7, 6, 5, 5, w, w, 5, 5, 6, 7, 0, 0, 0],
-            [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        ];
-        let frames: [[[u8; 16]; 16]; 2] = [frame_1, frame_2];
-        let mut addr = snes2pc(0x89B800);
-        for f in &frames {
-            for tile_y in 0..2 {
-                for tile_x in 0..2 {
-                    let mut tile: [[u8; 8]; 8] = [[0; 8]; 8];
-                    for y in 0..8 {
-                        for x in 0..8 {
-                            tile[y][x] = f[tile_y * 8 + y][tile_x * 8 + x];
+        for (i, &class) in classes.iter().enumerate() {
+            let mut addr = snes2pc(0x89B800 + i * 0x100);
+            for f in &foreign_item_frames(class) {
+                for tile_y in 0..2 {
+                    for tile_x in 0..2 {
+                        let mut tile: [[u8; 8]; 8] = [[0; 8]; 8];
+                        for y in 0..8 {
+                            for x in 0..8 {
+                                tile[y][x] = f[tile_y * 8 + y][tile_x * 8 + x];
+                            }
                         }
+                        write_tile_4bpp(self.rom, addr, tile)?;
+                        addr += 32;
                     }
-                    write_tile_4bpp(self.rom, addr, tile)?;
-                    addr += 32;
                 }
             }
         }
@@ -3151,7 +3242,7 @@ impl Patcher<'_> {
         self.write_nothing_item_graphics()?;
         if !self.randomization.foreign_items.is_empty() {
             self.write_foreign_item_graphics()?;
-            self.write_foreign_item_messages()?;
+            self.write_foreign_items_table()?;
         }
         Ok(())
     }

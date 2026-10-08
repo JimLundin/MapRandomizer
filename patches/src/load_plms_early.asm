@@ -160,6 +160,8 @@ is_delayed_plm:
 
     CMP #$F000      ; wall jump boots item PLM
     BEQ .done
+    CMP #$F300      ; foreign item PLM (foreign_item.asm), out in the open
+    BEQ .done
     CMP #$D70C      ; Glass Tunnel PLM (overwrites FX setup)
     BEQ .done
     CMP #$B777      ; Statues Room PLM to clear blocks (spawned during FX setup)
