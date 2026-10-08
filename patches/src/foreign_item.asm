@@ -6,10 +6,13 @@
 ; that knows more about the item, e.g. a multiworld patch, replaces it with a JML to its own routine), then plays the
 ; item fanfare (or, with fanfares off, a sound effect) and shows the item's message, if it has one.
 ;
-; patch.rs places the item PLMs at the locations listed in the randomization's `foreign_items`, and writes their
-; messages to `foreign_item_messages`: for each item, a word with the item bit (bits 0-14) and the number of rows
-; minus one (bit 15), then two rows of 26 message box tile numbers (dialog_chars.tbl and the HUD digits $00-$09,
-; without their attributes); a word $FFFF ends the table. The message box is extended_msg_boxes.asm's message $30.
+; Each class (progression, useful, filler) has its own graphics.
+;
+; patch.rs places the item PLMs at the locations listed in the randomization's `foreign_items`, and describes them
+; in `foreign_items_table`: for each item, a word with the item bit (bits 0-9), the class (bits 12-13: 0
+; progression, 1 useful, 2 filler) and the number of message rows (bits 14-15: 0 to 2), then two rows of 26 message
+; box tile numbers (dialog_chars.tbl and the HUD digits $00-$09, without their attributes); a word $FFFF ends the
+; table. The message box is extended_msg_boxes.asm's message $30.
 
 lorom
 
@@ -22,14 +25,13 @@ incsrc "constants.asm"
 !bank_85_free_space_start = $85A050
 !bank_85_free_space_end = $85A100
 !bank_94_free_space_start = $94B1B0
-!bank_94_free_space_end = $94B2A0
+!bank_94_free_space_end = $94B400
 
-!foreign_item_messages = $83C000      ; written by patch.rs, up to $83D540
-!foreign_item_message = $7EF4E4       ; offset of the message being shown in foreign_item_messages
+!foreign_items_table = $83C000        ; written by patch.rs, up to $83D540
+!foreign_item_message = $7EF4E4       ; offset in foreign_items_table of the item whose message is shown
 !message_row_chars = 26
 !message_entry_size = 54             ; 2 + 2 rows * !message_row_chars
 
-!foreign_item_gfx = $B800             ; bank $89 (written by patch.rs)
 
 org !bank_84_free_space_start
 ; These PLM entries must be at the addresses that patch.rs uses, starting at $84F300
@@ -39,8 +41,7 @@ dw $EE8E, foreign_sce         ; PLM $F308 (foreign item, scenery shot block)
 
 ;;; Instruction list - PLM $F300 (foreign item)
 foreign:
-    dw $8764, !foreign_item_gfx            ; Load item PLM GFX
-    db $00, $00, $00, $00, $00, $00, $00, $00
+    dw load_foreign_gfx                    ; Load item PLM GFX, of the item's class
     dw $887C, .end                         ; Go to end if the room argument item is set
     dw $8A24, .triggered                   ; Set link instruction for when triggered
     dw $86C1, $DF89                        ; Pre-instruction = go to link instruction if triggered
@@ -50,14 +51,13 @@ foreign:
     dw $8724, .animate                     ; Go to animate
 .triggered:
     dw $8899                               ; Set the room argument item
-    dw collect_foreign                     ; Call the foreign item hook
+    dw pickup_foreign                      ; Pick up the foreign item
 .end:
     dw $8724, $DFA9                        ; Go to $DFA9
 
 ;;; Instruction list - PLM $F304 (foreign item, chozo orb)
 foreign_orb:
-    dw $8764, !foreign_item_gfx            ; Load item PLM GFX
-    db $00, $00, $00, $00, $00, $00, $00, $00
+    dw load_foreign_gfx                    ; Load item PLM GFX, of the item's class
     dw $887C, .end                         ; Go to end if the room argument item is set
     dw $8A2E, $DFAF                        ; Call $DFAF (item orb)
     dw $8A2E, $DFC7                        ; Call $DFC7 (item orb burst)
@@ -71,28 +71,42 @@ foreign_orb:
     dw $8724, .animate                     ; Go to animate
 .triggered:
     dw $8899                               ; Set the room argument item
-    dw collect_foreign                     ; Call the foreign item hook
+    dw pickup_foreign                      ; Pick up the foreign item
 .end:
     dw $0001, $A2B5
     dw $86BC                               ; Delete
 
-; Instruction: the foreign item's pickup, with the room argument (the location's item bit) in A.
-collect_foreign:
+; Instruction: $8764 (load item PLM GFX) with the arguments of the item's class.
+load_foreign_gfx:
+    jsl foreign_item_gfx_args
+    phy
+    tay
+    jsr $8764
+    ply
+    rts
+
+; Instruction: the pickup.
+pickup_foreign:
     phx
     phy
-    lda $1DC7,x
     jsl foreign_item_pickup
     ply
     plx
     rts
+
+; Arguments of instruction $8764 for each class (foreign_item_gfx_args_by_class): graphics in bank $89, written by
+; patch.rs, and palettes.
+gfx_args_progression:
+    dw $B800 : db $00, $00, $00, $00, $00, $00, $00, $00
+gfx_args_useful:
+    dw $B900 : db $00, $00, $00, $00, $00, $00, $00, $00
 
 assert pc() <= !bank_84_free_space_end
 
 org !bank_84_free_space2_start
 ;;; Instruction list - PLM $F308 (foreign item, scenery shot block)
 foreign_sce:
-    dw $8764, !foreign_item_gfx            ; Load item PLM GFX
-    db $00, $00, $00, $00, $00, $00, $00, $00
+    dw load_foreign_gfx                    ; Load item PLM GFX, of the item's class
 .start:
     dw $8A2E, $E007                        ; Call $E007 (item shot block)
     dw $887C, .end                         ; Go to end if the room argument item is set
@@ -108,10 +122,13 @@ foreign_sce:
     dw $8724, .start                       ; Go to start
 .triggered:
     dw $8899                               ; Set the room argument item
-    dw collect_foreign                     ; Call the foreign item hook
+    dw pickup_foreign                      ; Pick up the foreign item
 .end:
     dw $8A2E, $E032                        ; Call $E032 (empty item shot block reconcealing)
     dw $8724, .start                       ; Go to start
+
+gfx_args_filler:
+    dw $BA00 : db $00, $00, $00, $00, $00, $00, $00, $00
 
 assert pc() <= !bank_84_free_space2_end
 
@@ -165,24 +182,61 @@ foreign_item_message_box:
 assert pc() <= !bank_85_free_space_end
 
 org !bank_94_free_space_start
-; The pickup (JSL from the PLM), with A = the location's item bit, data bank $84.
+; The table entry of PLM X's item: X = its offset in foreign_items_table, carry set if there is one.
+find_entry:
+    lda $1DC7,x                        ; the item bit
+    pha
+    ldx #$0000
+.loop:
+    lda.l !foreign_items_table,x
+    cmp #$FFFF
+    beq .none
+    and #$03FF
+    cmp $01,s
+    beq .found
+    txa : clc : adc.w #!message_entry_size : tax
+    bra .loop
+.found:
+    pla
+    sec
+    rts
+.none:
+    pla
+    clc
+    rts
+
+; The address in bank $84 of the instruction $8764 arguments for PLM X's item (JSL; X = PLM index, data bank $84).
+; X and Y are kept.
+foreign_item_gfx_args:
+    phx
+    jsr find_entry
+    lda #$0000                         ; progression, if not found
+    bcc .class
+    lda.l !foreign_items_table,x
+    xba
+    lsr : lsr : lsr : lsr
+    and #$0003
+    asl
+.class:
+    tax
+    lda.l foreign_item_gfx_args_by_class,x
+    plx
+    rtl
+
+foreign_item_gfx_args_by_class:
+    dw gfx_args_progression, gfx_args_useful, gfx_args_filler
+
+; The pickup (JSL; X = PLM index, data bank $84).
 foreign_item_pickup:
     php
     rep #$30
-    pha                                ; the item bit, on the stack while looking for its message
-    jsl foreign_item_hook
-    ldx #$0000
-.find:                                 ; the item's message
-    lda.l !foreign_item_messages,x
-    cmp #$FFFF
+    lda $1DC7,x
+    jsl foreign_item_hook              ; with A = the item bit
+    jsr find_entry
+    bcc .no_message
+    lda.l !foreign_items_table,x
+    and #$C000
     beq .no_message
-    and #$7FFF
-    cmp $01,s
-    beq .message
-    txa : clc : adc.w #!message_entry_size : tax
-    bra .find
-.message:
-    pla
     txa
     sta.l !foreign_item_message
     lda.l $848BF2
@@ -211,7 +265,6 @@ foreign_item_pickup:
     plp
     rtl
 .no_message:
-    pla
     jsr click
     plp
     rtl
@@ -225,11 +278,10 @@ click:
 foreign_item_message_rows:
     lda.l !foreign_item_message
     tax
-    lda.l !foreign_item_messages,x     ; rows - 1 in bit 15
-    asl
-    lda #$0000
-    rol
-    inc
+    lda.l !foreign_items_table,x       ; rows in bits 14-15
+    xba
+    lsr : lsr : lsr : lsr : lsr : lsr
+    and #$0003
     sta $16
     txa
     inc : inc
@@ -244,7 +296,7 @@ foreign_item_message_rows:
 .char:
     phx
     ldx $12
-    lda.l !foreign_item_messages,x
+    lda.l !foreign_items_table,x
     plx
     and #$00FF
     cmp #$000A

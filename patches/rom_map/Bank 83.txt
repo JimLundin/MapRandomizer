@@ -6,6 +6,6 @@ B800 - B9B3: ; Area FX.asm
 BA00 - BAFF: [FREE]
 BB00 - BC39: ; disableable_etanks.asm
 BC40 - BFFF: [FREE]
-C000 - D53F: foreign item messages (written by patch.rs; foreign_item.asm)
+C000 - D53F: foreign items table: class and message (written by patch.rs; foreign_item.asm)
 D540 - DFFF: [FREE]
 F000 - FFFF:  Mosaic (FX data)
