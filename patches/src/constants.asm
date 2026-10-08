@@ -54,6 +54,9 @@
 ; range of foreign item PLMs in bank 84 (foreign_item.asm)
 !foreign_item_plm_start = #$F300
 !foreign_item_plm_end = #$F30C
+; foreign item message box (foreign_item.asm), shown as message $30 by extended_msg_boxes.asm
+!foreign_item_message_id = #$0030
+!foreign_item_message_box = $85A054
 
 ; Settings:
 ; target number of frames for the pause menu black screen to lag
