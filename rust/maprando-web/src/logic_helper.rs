@@ -1064,6 +1064,7 @@ fn get_vanilla_randomization(vanilla_map: &Map) -> Randomization {
         toilet_intersections: vec![],
         locked_doors: vec![],
         item_placement: vec![Item::Missile; 100],
+        foreign_items: vec![],
         start_location: StartLocation::default(),
         escape_time_seconds: 0.0,
         essential_spoiler_data: EssentialSpoilerData {

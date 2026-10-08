@@ -2690,7 +2690,8 @@ impl<'a> MapPatcher<'a> {
     }
 
     fn indicate_items(&mut self) -> Result<()> {
-        for (i, &item) in self.randomization.item_placement.iter().enumerate() {
+        for i in 0..self.randomization.item_placement.len() {
+            let item = self.randomization.marker_item(i);
             let (room_id, node_id) = self.game_data.item_locations[i];
             let room_ptr = self.game_data.room_ptr_by_id[&room_id];
             let room_idx = self.game_data.room_idx_by_ptr[&room_ptr];

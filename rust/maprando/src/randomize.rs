@@ -378,6 +378,35 @@ pub struct EssentialSpoilerData {
     pub item_spoiler_info: Vec<EssentialItemSpoilerInfo>,
 }
 
+// How an item that belongs to another game is classified there, which decides how the map marks it.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ForeignItemClass {
+    Progression,
+    Useful,
+    Filler,
+}
+
+impl ForeignItemClass {
+    // The item whose map marker a foreign item of this class uses.
+    pub fn marker_item(self) -> Item {
+        match self {
+            ForeignItemClass::Progression => Item::Morph, // any unique item
+            ForeignItemClass::Useful => Item::ETank,
+            ForeignItemClass::Filler => Item::Missile,
+        }
+    }
+}
+
+// An item that belongs to another game (e.g. another player's world in a multiworld), at one of the item
+// locations. It gives Samus nothing, so the location's `item_placement` entry must be `Item::Nothing`; but the ROM
+// shows a collectible item there, whose pickup sets the location's item bit and calls the foreign item hook
+// (patches/src/foreign_item.asm).
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ForeignItem {
+    pub location_idx: usize, // Index into GameData.item_locations (and Randomization.item_placement)
+    pub class: ForeignItemClass,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Randomization {
     pub objectives: Vec<Objective>,
@@ -386,12 +415,31 @@ pub struct Randomization {
     pub toilet_intersections: Vec<RoomGeometryRoomIdx>,
     pub locked_doors: Vec<LockedDoor>,
     pub item_placement: Vec<Item>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub foreign_items: Vec<ForeignItem>,
     pub start_location: StartLocation,
     pub escape_time_seconds: f32,
     pub essential_spoiler_data: EssentialSpoilerData,
     pub seed: usize,
     pub display_seed: usize,
     pub seed_name: String,
+}
+
+impl Randomization {
+    pub fn foreign_item_class(&self, location_idx: usize) -> Option<ForeignItemClass> {
+        self.foreign_items
+            .iter()
+            .find(|x| x.location_idx == location_idx)
+            .map(|x| x.class)
+    }
+
+    // The item whose map marker the item location uses: its foreign item's, or the placed item's.
+    pub fn marker_item(&self, location_idx: usize) -> Item {
+        match self.foreign_item_class(location_idx) {
+            Some(class) => class.marker_item(),
+            None => self.item_placement[location_idx],
+        }
+    }
 }
 
 struct SelectItemsOutput {
@@ -5119,6 +5167,7 @@ impl<'r> Randomizer<'r> {
             toilet_intersections: self.toilet_intersections.clone(),
             locked_doors: self.locked_door_data.locked_doors.clone(),
             item_placement,
+            foreign_items: vec![],
             escape_time_seconds: spoiler_log.escape.final_time_seconds,
             essential_spoiler_data: self.get_essential_spoiler_data(self.settings, &spoiler_log),
             seed,
@@ -5620,6 +5669,7 @@ impl<'r> Randomizer<'r> {
             toilet_intersections: self.toilet_intersections.clone(),
             locked_doors: self.locked_door_data.locked_doors.clone(),
             item_placement: vec![Item::Nothing; 100],
+            foreign_items: vec![],
             escape_time_seconds: spoiler_log.escape.final_time_seconds,
             essential_spoiler_data: self.get_essential_spoiler_data(self.settings, &spoiler_log),
             seed,

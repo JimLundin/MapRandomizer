@@ -3,7 +3,8 @@ EFD7 - EFE7: ; vanilla_camerafixes.asm
 F000 - F0E1: ; walljump_plm.asm
 F0E2 - F27F: ; split_speed_plm.asm
 F28B - F2FF: ; mb_barrier_clear.asm
-F300 - F380: [FREE]
+F300 - F374: ; foreign_item.asm
+F375 - F380: [FREE]
 F380 - F418: ; escape.asm
 F480 - F489: ; etank_refill_full.asm
 F490 - F499: ; reserve_hud.asm
@@ -14,7 +15,8 @@ F590 - F59D: ; horizontal_door_fix.asm
 F5A0 - F5B5: ; energy_station_reserves.asm
 F5C0 - F62F: ; wall_doors.asm
 F630 - F68F: ; trimmed_fanfare.asm
-F690 - F6CF: [FREE]
+F690 - F6CA: ; foreign_item.asm
+F6CB - F6CF: [FREE]
 F6D0 - F6F9: ; missile_refill_all.asm
 F700 - F721: ; nothing_item.asm
 F730 - F7F1: ; stats.asm
