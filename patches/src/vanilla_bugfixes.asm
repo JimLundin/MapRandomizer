@@ -159,11 +159,15 @@ org $848365
 ; Return carry set if the PLM is an item.
 ; We put this in space related to special X-ray blocks which is now unused (used in vanilla only in BT Room during escape)
 ; The vanilla check is if PLM ID >= item_plm_start ($DF89)
-; We change this to check item_plm_start <= PLM_ID <= item_plm_end.
+; We change this to check item_plm_start <= PLM_ID <= item_plm_end, or that it is a foreign item PLM.
 check_item_plm:
 	cmp !item_plm_start
 	bcc .is_not_item
 	cmp !item_plm_end
+	bcc .is_item
+	cmp !foreign_item_plm_start
+	bcc .is_not_item
+	cmp !foreign_item_plm_end
 	bcs .is_not_item
 .is_item:
 	sec

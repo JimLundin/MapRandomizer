@@ -258,6 +258,18 @@ pub fn xy_to_explored_bit_ptr(x: isize, y: isize) -> (isize, u8) {
     (offset_byte_part, offset_bitmask)
 }
 
+// Foreign item PLMs (patches/src/foreign_item.asm), by item container: none, chozo orb, shot block (scenery)
+const FOREIGN_ITEM_PLM_TYPES: [isize; 3] = [0xF300, 0xF304, 0xF308];
+
+fn is_item_plm_type(plm_type: isize) -> bool {
+    (0xEED7..=0xF100).contains(&plm_type) || FOREIGN_ITEM_PLM_TYPES.contains(&plm_type)
+}
+
+fn foreign_item_plm_type(orig_plm_type: isize) -> isize {
+    let item_container = (orig_plm_type - 0xEED7) / 84;
+    FOREIGN_ITEM_PLM_TYPES[item_container as usize]
+}
+
 fn item_to_plm_type(item: Item, orig_plm_type: isize) -> isize {
     let item_id = item as isize;
 
@@ -622,6 +634,10 @@ impl Patcher<'_> {
             patches.push("extended_msg_boxes");
         }
 
+        if !self.randomization.foreign_items.is_empty() {
+            patches.push("foreign_item");
+        }
+
         match self.settings.quality_of_life_settings.etank_refill {
             ETankRefill::Disabled => {
                 patches.push("etank_refill_disabled");
@@ -841,12 +857,36 @@ impl Patcher<'_> {
 
     fn place_items(&mut self) -> Result<()> {
         let mut nothing_count: isize = 0;
-        for (&item, &loc) in iter::zip(
+        for foreign_item in &self.randomization.foreign_items {
+            let idx = foreign_item.location_idx;
+            ensure!(
+                self.randomization.item_placement.get(idx) == Some(&Item::Nothing),
+                "foreign item at location {idx}, which has no Nothing item"
+            );
+            ensure!(
+                self.randomization
+                    .foreign_items
+                    .iter()
+                    .filter(|x| x.location_idx == idx)
+                    .count()
+                    == 1,
+                "more than one foreign item at location {idx}"
+            );
+        }
+        for (i, (&item, &loc)) in iter::zip(
             &self.randomization.item_placement,
             &self.game_data.item_locations,
-        ) {
+        )
+        .enumerate()
+        {
             let item_plm_ptr = self.game_data.node_ptr_map[&loc];
             let orig_plm_type = self.orig_rom.read_u16(item_plm_ptr)?;
+            if self.randomization.foreign_item_class(i).is_some() {
+                // A collectible item (not collected at the start, unlike Nothing), so not counted as Nothing.
+                self.rom
+                    .write_u16(item_plm_ptr, foreign_item_plm_type(orig_plm_type))?;
+                continue;
+            }
             let new_plm_type = item_to_plm_type(item, orig_plm_type);
             self.rom.write_u16(item_plm_ptr, new_plm_type)?;
             if item == Item::Nothing {
@@ -2979,6 +3019,63 @@ impl Patcher<'_> {
         Ok(())
     }
 
+    fn write_foreign_item_graphics(&mut self) -> Result<()> {
+        let w = 0xc;
+        let frame_1: [[u8; 16]; 16] = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
+            [0, 0, 0, 7, 6, 5, 5, 3, 3, 5, 5, 6, 7, 0, 0, 0],
+            [0, 0, 7, 6, 5, 5, 3, w, w, 3, 5, 5, 6, 7, 0, 0],
+            [0, 7, 6, 5, 5, 3, w, w, w, w, 3, 5, 5, 6, 7, 0],
+            [0, 7, 6, 5, 5, 3, w, w, w, w, 3, 5, 5, 6, 7, 0],
+            [0, 0, 7, 6, 5, 5, 3, w, w, 3, 5, 5, 6, 7, 0, 0],
+            [0, 0, 0, 7, 6, 5, 5, 3, 3, 5, 5, 6, 7, 0, 0, 0],
+            [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+        let frame_2: [[u8; 16]; 16] = [
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
+            [0, 0, 0, 7, 6, 5, 5, w, w, 5, 5, 6, 7, 0, 0, 0],
+            [0, 0, 7, 6, 5, 5, w, 1, 1, w, 5, 5, 6, 7, 0, 0],
+            [0, 7, 6, 5, 5, w, 1, 1, 1, 1, w, 5, 5, 6, 7, 0],
+            [0, 7, 6, 5, 5, w, 1, 1, 1, 1, w, 5, 5, 6, 7, 0],
+            [0, 0, 7, 6, 5, 5, w, 1, 1, w, 5, 5, 6, 7, 0, 0],
+            [0, 0, 0, 7, 6, 5, 5, w, w, 5, 5, 6, 7, 0, 0, 0],
+            [0, 0, 0, 0, 7, 6, 5, 5, 5, 5, 6, 7, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 7, 6, 5, 5, 6, 7, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 7, 6, 6, 7, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+        let frames: [[[u8; 16]; 16]; 2] = [frame_1, frame_2];
+        let mut addr = snes2pc(0x89B800);
+        for f in &frames {
+            for tile_y in 0..2 {
+                for tile_x in 0..2 {
+                    let mut tile: [[u8; 8]; 8] = [[0; 8]; 8];
+                    for y in 0..8 {
+                        for x in 0..8 {
+                            tile[y][x] = f[tile_y * 8 + y][tile_x * 8 + x];
+                        }
+                    }
+                    write_tile_4bpp(self.rom, addr, tile)?;
+                    addr += 32;
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn write_nothing_item_graphics(&mut self) -> Result<()> {
         // Used in Bomb Torizo Room.
         self.rom.write_n(snes2pc(0x89B100), &[0; 0x100])?;
@@ -2990,6 +3087,9 @@ impl Patcher<'_> {
         self.write_spark_booster_item_graphics()?;
         self.write_bluebooster_item_graphics()?;
         self.write_nothing_item_graphics()?;
+        if !self.randomization.foreign_items.is_empty() {
+            self.write_foreign_item_graphics()?;
+        }
         Ok(())
     }
 
@@ -3075,7 +3175,7 @@ impl Patcher<'_> {
                 if plm_type == 0x0000 {
                     break;
                 }
-                if (0xEED7..=0xF100).contains(&plm_type) {
+                if is_item_plm_type(plm_type) {
                     // item PLM
                     let mut plm_x = self.rom.read_u8(intersection_plm_ptr + 2)?;
                     let mut plm_y = self.rom.read_u8(intersection_plm_ptr + 3)?;

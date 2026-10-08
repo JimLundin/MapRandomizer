@@ -51,6 +51,9 @@
 ; range of item PLMs in bank 84
 !item_plm_start = #$DF89
 !item_plm_end = #$F100
+; range of foreign item PLMs in bank 84 (foreign_item.asm)
+!foreign_item_plm_start = #$F300
+!foreign_item_plm_end = #$F30C
 
 ; Settings:
 ; target number of frames for the pause menu black screen to lag

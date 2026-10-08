@@ -159,7 +159,8 @@ pub fn get_spoiler_images(
             item_coords.insert(item.addr, (item.x, item.y));
         }
     }
-    for (i, &item) in randomization.item_placement.iter().enumerate() {
+    for i in 0..randomization.item_placement.len() {
+        let item = randomization.marker_item(i);
         let (room_id, node_id) = game_data.item_locations[i];
         let room_ptr = game_data.room_ptr_by_id[&room_id];
         let room_idx = game_data.room_idx_by_ptr[&room_ptr];
