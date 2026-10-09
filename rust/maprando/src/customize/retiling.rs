@@ -1,6 +1,5 @@
-use std::path::Path;
-
 use super::mosaic::MosaicTheme;
+use crate::paths::data_path;
 use crate::{
     customize::{PaletteTheme, StatuesHallwayTiling},
     patch::{ExtraRoomData, Rom, apply_ips_patch, bps::BPSPatch, get_room_state_ptrs, snes2pc},
@@ -15,7 +14,7 @@ use super::TileTheme;
 const BPS_PATCH_PATH: &str = "../patches/mosaic";
 
 fn apply_bps_patch(rom: &mut Rom, orig_rom: &Rom, filename: &str) -> Result<()> {
-    let path = Path::new(BPS_PATCH_PATH).join(filename);
+    let path = data_path(BPS_PATCH_PATH).join(filename);
     let patch_bytes = std::fs::read(path).with_context(|| format!("Loading {filename}"))?;
     let patch = BPSPatch::new(patch_bytes)?;
     patch.apply(&orig_rom.data, &mut rom.data);
@@ -92,7 +91,7 @@ pub fn apply_retiling_and_palettes(
     ];
     for name in &patch_names {
         let patch_path_str = format!("../patches/ips/{name}.ips");
-        apply_ips_patch(rom, Path::new(&patch_path_str))?;
+        apply_ips_patch(rom, &data_path(&patch_path_str))?;
     }
 
     let mut fx_door_ptr_map: HashMap<(RoomPtr, RoomStateIdx, DoorPtr), DoorPtr> = HashMap::new();
@@ -231,7 +230,7 @@ pub fn apply_retiling_and_palettes(
     // This patch keys effects off the unshuffled map area, so it would be incorrect for
     // AreaShuffled even though that mode otherwise follows AreaThemed behavior.
     if *theme == TileTheme::AreaThemed {
-        apply_ips_patch(rom, Path::new("../patches/ips/mosaic_fx_fix.ips"))?;
+        apply_ips_patch(rom, &data_path("../patches/ips/mosaic_fx_fix.ips"))?;
     }
 
     if *theme != TileTheme::Vanilla {
