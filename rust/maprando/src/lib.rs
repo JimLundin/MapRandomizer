@@ -8,6 +8,7 @@ pub mod difficulty;
 pub mod helpers;
 pub mod map_repository;
 pub mod patch;
+pub mod paths;
 pub mod preset;
 pub mod randomize;
 pub mod seed_repository;

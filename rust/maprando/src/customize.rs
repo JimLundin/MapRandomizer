@@ -8,10 +8,10 @@ use anyhow::{Result, bail};
 use hashbrown::HashMap;
 use log::info;
 use std::cmp::min;
-use std::path::Path;
 
 use crate::patch::glowpatch_writer::write_glowpatch;
 use crate::patch::{ExtraRoomData, Rom, apply_ips_patch, snes2pc, write_credits_big_char};
+use crate::paths::data_path;
 use maprando_game::{GameData, Map, RoomPtr};
 use mosaic::MosaicTheme;
 use retiling::apply_retiling_and_palettes;
@@ -247,7 +247,7 @@ fn apply_custom_samus_sprite(
             .clone()
             .unwrap_or("samus_vanilla".to_string());
         let patch_path_str = format!("../patches/samus_sprites/{sprite_name}.ips");
-        apply_ips_patch(rom, Path::new(&patch_path_str))?;
+        apply_ips_patch(rom, &data_path(&patch_path_str))?;
 
         if settings.vanilla_screw_attack_animation {
             // Disable spin attack animation, to make it behave like vanilla: Screw attack animation will look like
@@ -390,7 +390,7 @@ fn apply_controller_config(rom: &mut Rom, controller_config: &ControllerConfig) 
     rom.write_u16(snes2pc(0x82FE7E), quick_reload_mask)?;
 
     if controller_config.moonwalk {
-        apply_ips_patch(rom, Path::new("../patches/ips/enable_moonwalk.ips"))?;
+        apply_ips_patch(rom, &data_path("../patches/ips/enable_moonwalk.ips"))?;
     }
     // $82FE7E
 
@@ -540,10 +540,10 @@ pub fn customize_rom(
     match settings.door_theme {
         DoorTheme::Vanilla => {}
         DoorTheme::Vibrant => {
-            apply_ips_patch(rom, Path::new("../patches/ips/alternate_door_colors.ips"))?;
+            apply_ips_patch(rom, &data_path("../patches/ips/alternate_door_colors.ips"))?;
         }
         DoorTheme::Contrast => {
-            apply_ips_patch(rom, Path::new("../patches/ips/alternate_door_colors.ips"))?;
+            apply_ips_patch(rom, &data_path("../patches/ips/alternate_door_colors.ips"))?;
             rom.write_u16(snes2pc(0xdfe200), 0x03BF)?; // high contrast power bomb door color
             rom.write_u16(snes2pc(0xdfe202), 0x0278)?; // high contrast power bomb door color
             rom.write_u16(snes2pc(0xdfe204), 0x00EC)?; // high contrast power bomb door color
@@ -580,7 +580,7 @@ pub fn customize_rom(
         rom.write_u16(snes2pc(0xA7CA7B), color)?; // During Phantoon power-on
     }
     if settings.reserve_hud_style {
-        apply_ips_patch(rom, Path::new("../patches/ips/reserve_hud.ips"))?;
+        apply_ips_patch(rom, &data_path("../patches/ips/reserve_hud.ips"))?;
     }
     if settings.room_names {
         rom.write_u16(snes2pc(0x82FFFA), 1)?;
@@ -643,10 +643,10 @@ pub fn customize_rom(
     }
     match settings.flashing {
         FlashingSetting::Vanilla => {
-            apply_ips_patch(rom, Path::new("../patches/ips/flashing_placebo.ips"))?;
+            apply_ips_patch(rom, &data_path("../patches/ips/flashing_placebo.ips"))?;
         }
         FlashingSetting::Reduced => {
-            apply_ips_patch(rom, Path::new("../patches/ips/flashing_placebo.ips"))?;
+            apply_ips_patch(rom, &data_path("../patches/ips/flashing_placebo.ips"))?;
             write_glowpatch(rom, &game_data.reduced_flashing_patch)?;
         }
     }

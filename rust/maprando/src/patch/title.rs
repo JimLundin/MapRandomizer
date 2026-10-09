@@ -1,6 +1,5 @@
-use std::path::Path;
-
 use crate::patch::compress::compress;
+use crate::paths::data_path;
 use maprando_game::{IndexedVec, read_image};
 
 use super::{PcAddr, Rom, decompress::decompress, pc2snes, snes2pc};
@@ -344,8 +343,8 @@ impl<'a> TitlePatcher<'a> {
 
         // Now we will patch the tiles & spritemap by adding "Map Rando" to the same sprite.
         // First load the image:
-        let image_path = Path::new("../gfx/title/maprando.png");
-        let img = read_image(image_path)?;
+        let image_path = data_path("../gfx/title/maprando.png");
+        let img = read_image(&image_path)?;
         assert!(img.dim() == (224, 256, 3));
 
         // We don't modify the palette, just reuse colors from the existing palette.

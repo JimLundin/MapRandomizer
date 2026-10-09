@@ -10,6 +10,7 @@ pub mod title;
 
 use std::path::Path;
 
+use crate::paths::data_path;
 use crate::{
     customize::{
         CustomizeSettings, StatuesHallwayAudio, customize_rom, mosaic::MosaicTheme,
@@ -564,7 +565,7 @@ pub fn apply_ips_patch(rom: &mut Rom, patch_path: &Path) -> Result<()> {
 }
 
 fn apply_orig_ips_patches(rom: &mut Rom, settings: &RandomizerSettings) -> Result<()> {
-    let patches_dir = Path::new("../patches/ips/");
+    let patches_dir = data_path("../patches/ips/");
     let mut patches: Vec<&'static str> = vec!["mb_barrier_clear", "mb_left_entrance", "gray_doors"];
     patches.push("hud_expansion_opaque");
 
@@ -587,7 +588,7 @@ fn apply_orig_ips_patches(rom: &mut Rom, settings: &RandomizerSettings) -> Resul
 impl Patcher<'_> {
     fn apply_ips_patches(&mut self) -> Result<()> {
         self.rom.data.resize(0x400000, 0);
-        let patches_dir = Path::new("../patches/ips/");
+        let patches_dir = data_path("../patches/ips/");
         let mut patches = vec![
             "complementary_suits",
             "disable_map_icons",
